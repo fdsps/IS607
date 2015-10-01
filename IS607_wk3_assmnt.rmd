@@ -1,0 +1,25 @@
+---
+title: "IS607_wk3_assmnt"
+author: "Frank de Olivera"
+output: html_document
+---
+Dataset used:
+
+https://archive.ics.uci.edu/ml/datasets/Airfoil+Self-Noise#
+
+```{r}
+mydata <- read.table("https://raw.githubusercontent.com/fdsps/IS607/master/airfoil_self_noise.txt")
+names(mydata) <- c("freq","angle","chordlen","FSVel","SSDT","SSPLdB")
+head(mydata)
+summary(mydata)
+```
+
+Let's subset it
+
+```{r}
+ss <- subset(mydata, freq < 2000)
+head(ss)
+summary(ss)
+```
+
+Hmm, that's about it.
