@@ -1,0 +1,82 @@
+---
+title: "IS607_wk4_assmnt"
+author: "FDSPS"
+output: html_document
+---
+
+p. 217
+
+a) [0-9]+\\$
+
+Match a string with one or more digits followed by $.
+```{r}
+grep("[0-9]+\\$","100$") 
+grep("[0-9]+\\$","foo$") # fails
+grep("[0-9]+\\$","100") # fails
+grep("[0-9]+\\$","foo2$")
+```
+
+b) \\b[a-z]{1,4}\\b
+
+Match words 1-4 chars in length of alphabetic characters.
+
+```{r}
+grep("\\b[a-z]{1,4}\\b","a b")
+grep("\\b[a-z]{1,4}\\b","5 abcd 5") 
+grep("\\b[a-z]{1,4}\\b","5 abcde 5") # fails
+```
+
+c) .*?\\\\.txt$
+
+Match a string ending in .txt (eg. find text files).
+
+```{r}
+grep(".*?\\.txt$","hello world.txt")
+grep(".*?\\.txt$","hello world.dat") # fail
+grep(".*?\\.txt$","hello world.dat.txt")
+```
+
+The ? is redundant, I think.
+
+d) \\\\d{2}/\\\\d{2}/\\\\d{4}
+
+Date string in the format dd/dd/dddd
+
+```{r}
+grep("\\d{2}/\\d{2}/\\d{4}","11/22/2015")
+grep("\\d{2}/\\d{2}/\\d{4}","11/22/15") # nah
+```
+
+
+e) <(.+?)>.+?<\/\\\\1>
+
+Match balanced XML <.>.<\/.> tags with no whitespace in or between using backreference.
+
+```{r}
+grep("<(.+?)>.+?</\\1>","<f>foo</f>")
+grep("<(.+?)>.+?</\\1>","<f>foo</g>") # no
+```
+
+5.
+
+[^a-zA-Z]{1,}\\\\$
+
+6.
+
+a)
+```{r}
+library(stringr)
+s <- "chunkylover53[at]aol[dot]com"
+str_replace(s, "(.+)\\[at\\](.+)\\[dot\\](com)", "\\1@\\2.\\3")
+```
+
+b) [:digit:] matches only the first digit. Use [:digit:]+
+
+c) \\\\D matches first non-digit. Use \\\\d+
+
+```{r}
+str_extract(s, "[:digit:]")
+str_extract(s, "[:digit:]+")
+str_extract(s, "\\D")
+str_extract(s, "\\d+")
+```
