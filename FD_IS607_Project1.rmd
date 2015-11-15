@@ -1,0 +1,50 @@
+---
+title: "IS607 Project 1"
+author: "FD"
+output: html_document
+---
+
+Load the datafile, skipping the first three junk lines so we can begin at the first row of data.
+
+
+```{r, warning=FALSE, message=FALSE}
+chess <- read.csv("https://raw.githubusercontent.com/fdsps/IS607/master/Project1/tournamentinfo.txt", skip=3)
+require(stringr)
+```
+
+Player data spans two rows, separated by a dashed line. We could strip out junk lines, or just use indices to focus on the rows we want, ignoring the junk.
+
+
+```{r}
+toprow<-seq(1,nrow(chess),3)
+botrow<-seq(2,nrow(chess),3)
+```
+
+From here, we just create new lists of data using regex.
+
+```{r}
+opps <-str_extract_all(chess[toprow,1],"\\d{1,2}(?=\\|)") # collect the opposing player IDs for use later.
+
+players<- str_extract_all(chess[toprow,],"(?<=\\| )(\\w|\\s)+(?=\\|)")
+
+totpts <-str_extract_all(chess[toprow,1],"\\d\\.\\d")
+
+prerat <- as.numeric(str_extract_all(chess[botrow,1],"(?<=R:)\\s+\\d+")) # as.numeric for use in calculating the mean
+
+state <- str_sub(chess[botrow,1], start = 4, end = 5) # always in same position.
+```
+
+Now to calculate the opposing player averages. We use each row of *opps* as a list of keys into *prerat* (prerating), using sapply to calculate the mean on each row, conveniently saved to a list.
+
+```{r}
+opps_avg <- sapply(opps, function(x) mean(prerat[as.numeric(x)]))
+```
+
+Finally, build the dataframe with some clean-up.
+
+```{r}
+df<- data.frame("players" = unlist(str_trim(players)), "state" = state, "totpts" = unlist(totpts), "prerat" = unlist(prerat), 
+"opps_avg"= round(opps_avg) )
+df
+```
+
