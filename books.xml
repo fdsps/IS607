@@ -2,21 +2,23 @@
 <books>
 <book id="0688031838">
       <title>The People's Almanac Presents the Book of Lists</title>
-      <author> David Wallechinsky</author>
+      <authors>
+      <author>David Wallechinsky</author>
       <author>Irving Wallace</author>
       <author>Amy Wallace</author>
+      </authors>
       <genre>Non-fiction</genre>
       <publish_year>1977</publish_year>
 </book>
 <book id="0441172695">
       <title>Blood Meridian: Or the Evening Redness in the West</title>
-      <author>Cormac McCarthy</author>
+      <authors><author>Cormac McCarthy</author></authors>
       <genre>Fiction</genre>
       <publish_year>1992</publish_year>
 </book>
 <book id="0679728759">
       <title>Dune Messiah</title>
-      <author>Frank Herbert</author>
+      <authors><author>Frank Herbert</author></authors>
       <genre>Science Fiction</genre>
       <publish_year>1969</publish_year>
 </book>
