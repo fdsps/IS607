@@ -1,0 +1,31 @@
+{
+  "books": {
+    "book": [
+      {
+        "id": "0688031838",
+        "title": "The People's Almanac Presents the Book of Lists",
+        "author": [
+          " David Wallechinsky",
+          "Irving Wallace",
+          "Amy Wallace"
+        ],
+        "genre": "Non-fiction",
+        "publish_year": "1977"
+      },
+      {
+        "id": "0441172695",
+        "title": "Blood Meridian: Or the Evening Redness in the West",
+        "author": "Cormac McCarthy",
+        "genre": "Fiction",
+        "publish_year": "1992"
+      },
+      {
+        "id": "0679728759",
+        "title": "Dune Messiah",
+        "author": "Frank Herbert",
+        "genre": "Science Fiction",
+        "publish_year": "1969"
+      }
+    ]
+  }
+}j
