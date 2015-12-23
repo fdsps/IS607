@@ -1,0 +1,66 @@
+---
+title: 'Week 8 assignment: XML & JSON'
+author: "FD"
+output: html_document
+---
+
+```{r}
+library(stringr)
+library(XML)
+library(jsonlite)
+library(RCurl)
+```
+
+Importing HTML tables and JSON to a dataframe is simple. The packages do all the work:
+
+```{r}
+json_df <- fromJSON("https://raw.githubusercontent.com/fdsps/IS607/master/books.json")
+html_data<- readHTMLTable(getURL("https://raw.githubusercontent.com/fdsps/IS607/master/books.html"))
+html_df <- data.frame(html_data)
+json_df
+html_df
+```
+
+My XML file is problematic because of the id attribute and multiple "author" tags for the first title.
+
+```{r}
+books_xml <- xmlParse(getURL("https://raw.githubusercontent.com/fdsps/IS607/master/books.xml"))
+root <- xmlRoot(books_xml)
+xmlToDataFrame(root) 
+```
+
+ My solution is to grab each child node value and combine it into one string.
+
+```{r}
+auth<-c()
+author<-c()
+n <- length(xpathSApply(root, "//book/authors", xmlChildren)) # count of authors nodes
+for (i in 1:n){
+  j <- length(xpathSApply(root, "//book/authors", xmlChildren)[[i]]) # count of author children
+  if (j>1){
+    for (k in 1:j){
+      tmp <- xmlValue(xpathSApply(root, "//book/authors", xmlChildren)[[i]][[k]]) # index to each author child
+      auth <- str_c(auth, tmp, ";") 
+    }
+  }
+  else {
+    auth <- xmlValue(xpathSApply(root, "//book/authors", xmlChildren)[[i]][[1]])
+  }
+  author<-c(author, auth)
+}
+
+author
+```
+
+Now extract other fields and build dataframe.
+
+```{r}
+ids<-xmlSApply(root, xmlGetAttr, "id")
+ids <- paste(ids)
+titles <-xpathSApply(root, "//book/title", xmlValue)
+genres <-xpathSApply(root, "//book/genre", xmlValue)
+pub <- xpathSApply(root, "//book/publish_year", xmlValue)
+xml_df <- data.frame(id=ids, title=titles, author=author, genre=genres, pub_year=pub)
+
+xml_df
+```
