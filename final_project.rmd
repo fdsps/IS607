@@ -1,0 +1,184 @@
+---
+title: "IS607 Final Project"
+output:
+  html_document:
+    keep_md: yes
+---
+
+This project used the text mining techniques learned in class to explore the differences, if any, between screenplays classified by genre. The scripts were obtained from the The Internet Movie Script Database [http://www.imsdb.com/] using standard "web scraping" methods with R. The screenplays were extracted from HTML pages, processed, added to a corpus, and classified using a machine learning algorithm.
+
+*Data Acquisition*
+
+![Alt text](imsdb.jpg)
+
+
+The IMSDB hosts over 1000 screenplays in various formats, mostly preformatted text within an HTML page. Links to 18 genres on the home page were the starting point of the scraping phase. Genre links were extracted and followed to genre pages, where links to every film title where obtained. The titles, genres, and URLs were added to a data frame for use later.
+
+```{r, eval=FALSE}
+library(RCurl)
+library(XML)
+library(stringr)
+library(tm)
+library(dplyr)
+
+home <- "http://www.imsdb.com"
+```
+
+The IMSDB is an old site, and examining the source reveals its age. Little to no CSS is used, with all formatted done using embedded tables. This should've aided extraction, but the HTML is badly formatted with unclosed tags and various HTML structure violations. Using XPATH gave some unexpected results.
+
+The first step was to extract the genres and save to a data frame
+
+```{r, eval=FALSE}
+results <- getURL(home)
+results_tree <- htmlParse(results)
+
+gn<-xpathSApply(results_tree, "//td/a[contains(@href,'/genre')]",xmlValue) # genre names
+gl<-xpathSApply(results_tree, "//td/a[contains(@href,'/genre')]",xmlGetAttr,"href") # genre links
+genres<-data.frame(name=gn,rpath=gl, stringsAsFactors=FALSE) # save links to df
+```
+
+Looping through each genre, the member title pages were download. Having the titles already classified was convenient, but this created another problem, as we will see. The films database was then created and the script HTML pages save to a local "/scripts_html" folder.
+
+```{r,eval=FALSE}
+#films db build
+films<-data.frame(title=character(0),genre=character(0),rpath=character(0),spath=character(0),stringsAsFactors=FALSE)
+for (i in 1:nrow(genres)){
+ url<-str_c(home, genres$rpath[i])
+ rtree<- htmlParse(getURL(url)
+ titles <- xpathSApply(genre_tree, "//a[contains(@href,'/Movie')]",xmlValue)
+ rpaths <- xpathSApply(genre_tree, "//a[contains(@href,'/Movie')]",xmlGetAttr,'href')
+ for (j in 1:length(titles){
+  rbind(films, c(titles[j], genres[i], rpaths[j], str_c('/scripts/',str_replace_all(titles[j], " ","-")),".htm"))
+ }
+}
+```
+
+*Extraction*
+
+With the all data needed for screenplay extraction saved, the tricky business of locating the screenplay text inside the container HTML was addressed. Most of the screenplays are between <pre> tags at about the same location on every title page, but there are exceptions. Some pages do not use <pre> tags and the locations varied slightly. Some title pages are just placeholders with no screenplay link.Some screenplay links are to PDFs of photocopies of the script. I decided that any failure to find the <pre>..text..</pre> pattern, or any 404 errors, would be ignored.
+
+Bulk scrapes like this typically fail during the first run, perhaps due to server problems. I had to code with the expectation of multiple attempts and to avoid duplicates.
+
+```{r, eval=FALSE}
+script_dir <- "scripts_html/"
+exerr <- character(0) # record errors
+
+for (i in 1:nrow(films){
+  sfile <- str_c(script_dir,str_sub(films$spath[i],10))
+  rtree<-htmlParse(sfile)
+  stext <- xpathSApply(rtree, "//pre",xmlValue)
+  if(nchar(stext)>16000){ # skip failed loads # anything <16k is likely junk, so skip it.
+    sfile <- str_c("/corpus/",films$spath[i],10),".txt")
+    write(stext, sfile)
+  } else {
+    exerr<- c(exerr,films$spath[i])
+  }
+}
+```
+
+![Alt text](final_script_dir.jpg "Saved screenplay pages")
+
+
+
+The local films data frame contained a large number of duplicate titles. This is due to films being classified into multiple genres, some as many as six. Eighteen genres is far too many for this analysis, so I collapsed films into eight basic genres after some thought: comedy, drama, fantasy, horror, sci-fi, thriller, war, and western. Musical, animation, short, and film noir were dropped. Adventure, crime, mystery, and action genres were combined into thriller. Others were pushed into a single genre. This has the effect or greatly pruning the films database, but surely disproportionately weighing the membership of some groups. Barring more complex classification scheme, I decided this was an acceptable compromise.
+
+An example of the code used is given:
+
+```{r,eval=FALSE}
+# remove all animation titles
+tempdel <- films[films$genre %in% "Animation",1]
+films <- films[!(films$title %in% tempdel),]
+# remove all musicals, etc.
+tempdel<-films[films$genre %in% "Musical",1]
+films<-films[!(films$title %in% tempdel),]
+# collapse any film labeled "sci-fi" into sci-fi genre
+tempdel<-films[films$genre %in% c("Sci-Fi"),1]
+films<-films[!((films$title %in% tempdel) & !films$genre=="Sci-Fi"),] # works
+#
+films[films$genre %in% c("Adventure","Crime","Mystery","Action"), 2]<-"Thriller"
+
+films<- distinct(films,title)
+```
+
+The pruning wasn't perfect but only a handful of titles escaped unharmed.
+
+*Corpus Preparation and Plan B*
+
+The average obtained screenplay size is about 200K. This presented a serious processing challenge. My system (and most home systems) was unable to even load that much data into a corpus. Even the most powerful system I could borrow from a friend could not handle it with drastically limiting the size of the dataset used, reducing the validity of the analysis. Many examples of text mining using R packages show the user first building a corpus, then processing the document on the way to the document term matrix. I had to process the screenplays before building the corpus.
+
+```{r, eval=FALSE}
+sw <- stopwords("en") # from tm package.
+for (i in 1:nrow(films)){
+ sfile <- str_c("corpus/",str_sub(films$spath[i],10),".txt")
+ if (!file.exists(sfile)) next # not found, try next
+ scp <- paste(readLines(sfile), collapse="\n")
+ scp <- tolower(scp)
+ wl<-unlist(strsplit(scp, "\\W+")) # strip words only. punctuation is ignored.
+ wl<-setdiff(wl,sw)
+ swords<-paste(wl,collapse=" ")
+ save(swords, file=str_c("corpus/", str_sub(films$spath[i],10),".dat"))
+ # Note here I save the text as an R object for faster loading during testing.
+}
+```
+
+This cut the file sizes to a small fraction, enabling the building of a corpus.using the 1000+ files left after weeding out the noise.
+
+![Alt text](final_corpus_dir.jpg "Much smaller screenplay files")
+
+
+Now, build the corpus.
+
+```{r, eval=FALSE}
+indx <- sample(1:nrow(films),replace=FALSE) # random index to shuffle rows
+scorpus <- Corpus(VectorSource("dummy text")) # initialize first record
+meta(scorpus[[1]], "genre") <- "Western"
+docs<- 2 # index for corpus docs
+for (i in 1:nrow(films)) {
+ sfile <- str_c("corpus/",str_sub(films$spath[indx[i]],10),".dat")
+ 
+ if (!file.exists(sfile)){
+  next # Not found. The script text was not extracted due to a format error.
+ }
+ load(sfile) # load char object "swords" saved during preprocessing
+ scorpus <- c(scorpus, Corpus(VectorSource(swords)))
+ meta(scorpus[[docs]], "genre") <- films$genre[indx[i]]
+ docs<- docs + 1
+
+dtm<-DocumentTermMatrix(scorpus)
+labels <- unlist(meta(scorpus, "genre"))
+scorpus <- NULL # free precious memory.
+}
+```
+
+*Analysis*
+
+Building the DTM from from such a large corpus pushed the resource limits of my system, leaving little left for the analysis phase. The only algorithm I could consistently employ with depleting available RAM was Support Vector Machine. A training size of 500 docs with 200 for testing was found to be the maximum my system could handle.
+
+```{r,eval=FALSE}
+library(RTextTools)
+container <- create_container(dtm, labels, trainSize=1:500, testSize = 501:700, virgin=FALSE)
+svm_m <- train_model(container, algorithm="SVM")
+svm_res <- classify_model(container, svm_m)
+svm_comp<-data.frame(actual=labels[501:700], pred=svm_res[,1],stringsAsFactors=FALSE )
+```
+
+Performance stats:
+
+```{r, eval=FALSE}
+# overall
+acc<-sum(svm_comp$actual==svm_comp$pred)/200
+sprintf("Overall accuracy is %s",acc)
+
+rechart<-data.frame(genre=labels[501:700], class=rep("actual",200), stringsAsFactors=FALSE)
+rechart<-rbind(rechart, data.frame(svm_res[,1],rep("pred",200)))
+# a nice chart
+ggplot(data=rechart,aes(x=genre, fill=class),ylim=200)+geom_bar(stat="bin", position="dodge")
+```
+```{}
+## [1] "Overall accuracy is 0.7"
+```
+![Alt text](svmperformance.jpg "SVM results")
+
+*Results*
+
+The results are underwhelming but not entirely uninteresting. This analysis would certainly benefit from running on a distributed cloud system without the memory limitations. I expect classification results would be much better with a larger training dataset and other algorithms more suited to this type of data, such as Random Forrest or Bayesian Decision Tree.
