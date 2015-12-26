@@ -1,0 +1,115 @@
+---
+title: "Project 2"
+author: "FD"
+output: html_document
+---
+
+**Data transformation using dplyr & tidyr.**
+
+The first dataset is from the UCI Machine Learning Repository. [https://archive.ics.uci.edu/ml/datasets/wiki4HE]. The CSV contains a survey of faculty members from two Spanish universities on teaching uses of Wikipedi, with 43 Likert scale variables in "wide" format. I'm interested in five of the variables, columns Qu1 to Qu5. I want to see what the **average rating is for these five variables for users 55  and over.**
+
+```{r}
+library(stringr)
+library(plyr)
+library(dplyr)
+library(tidyr)
+
+sdata <- read.csv("https://raw.githubusercontent.com/fdsps/IS607/master/wiki4HE.csv", sep=";", stringsAsFactors=FALSE, na.strings="c(3)")
+
+# filter age condition, select target variables, gather to "long" format, and summarize.
+
+sdata %>% filter(AGE >=55) %>% select(Qu1:Qu5) %>% gather(Q, A) %>% group_by(Q) %>% summarise(mean=mean(A))
+```
+
+The same results are obtained with ddply:
+
+```{r}
+sdata %>% filter(AGE >=55) %>% select(Qu1:Qu5) %>% gather(Q, A) %>% group_by(Q) %>% ddply(.(Q), summarize, mean = mean(A))
+
+```
+
+Or we simply use plyr::colwise on the original table:
+
+```{r}
+sdata %>% filter(AGE >=55) %>% select(Qu1:Qu5) %>% plyr::colwise(mean)()
+```
+
+The next dataset is the 1970 Expected Survival Table from the National Cancer Institute. [http://seer.cancer.gov/expsurvival/1970.html]. This wide table has variables as columns with duplicate variable columns tucked underneath.
+
+```{r}
+library(XML)
+ht <- readHTMLTable("http://seer.cancer.gov/expsurvival/1970.html",as.data.frame = TRUE, which=1, stringsAsFactors = FALSE)
+
+head(ht)
+```
+
+The header we want came in as row 1 and must be adjusted.
+
+```{r}
+hed <- ht[1,1:8] %>% unlist() %>% as.vector()
+
+colnames(ht)<- c("age", hed)
+
+ht <- ht[-1,1:9]
+
+#  ht[-1,] and slice(ht,-1) jumbles the cell values, I suspect due to duplicate col names
+
+head(ht)
+```
+
+Looks good, but the male/female values must be associated with the "race" header from the html table. I will alter the labels and split the columns later.
+
+```{r}
+hed2 <- str_c( c('male.','female.'),c('w','w','b','b','o','o','u','u'))
+# w - white, b - black, o - other, u - unknown
+
+colnames(ht)<- c("age", hed2)
+
+longht <- gather(ht, sex, rate, -age) %>% arrange(as.numeric(age))
+head(longht)
+
+longht <- separate(longht, sex, c('sex','race'), sep = "[.]")
+head(longht)
+```
+
+Now we might as the question: what was the mean expected survival rate for black females ages 55 to 65 in 1970?
+
+```{r}
+filter(longht,sex == 'female', race =='b', age %in% 55:65) %>% select(rate) %>% unlist %>% as.numeric %>% mean
+```
+
+The next dataset is a table of infectious disease stats from the Rhode Island Department of Health [http://www.health.ri.gov/data/diseases/].
+
+```{r}
+ht <- readHTMLTable("http://www.health.ri.gov/data/diseases/",as.data.frame = TRUE, which=1, trim = TRUE, stringsAsFactors = FALSE)
+
+# Again, the column names came in as row 1.
+
+hed <- ht[1,1:7] %>% unlist() %>% as.vector()
+
+colnames(ht)<- c("Disease", hed)
+
+ht <- ht[-1,1:8]
+
+
+# Clean up extra spaces in the Disease column. stringr doesn't handle the second gsub pass properly.
+
+ht[,1] <- gsub(".data", "", ht[,1])
+ht[,1] <- gsub("\\s+", " ", ht[,1])
+
+# Gather and drop the computed mean/median columns.
+longht <- select(ht, -c(Mean,Median)) %>% gather(year,cases,-Disease)
+
+head(longht)
+```
+
+Now we can ask for a breakdown of diseases as % of total reported from 2009 to 2013.
+
+
+```{r}
+longht[,3]<-as.numeric(longht[,3])
+
+tot<-sum(longht$cases)
+sumt <- longht %>% group_by(Disease) %>% summarise(Sum_Of_Cases=sum(cases)) %>% as.data.frame
+cbind(sumt, '%_of_total'= round(sumt$Sum_Of_Cases/tot,4))
+```
